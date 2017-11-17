@@ -1,8 +1,10 @@
 /*!
-A version of StableVec where the `make_compact` methods are
-safe. Anything that produces an Index must be called on a
-JailedStableVec, and Indexes are only valid for the lifetime
-of the JailedStableVec.
+A version of `StableVec` that avoids the issue of indexes
+being invalid by `make_compact` and `reorder_make_compact`.
+
+Anything that produces an `Index` must be called on a
+`JailedStableVec`, and `Index`es are only valid for the lifetime
+of the `JailedStableVec`.
 
 ```
 # fn main() {
@@ -27,7 +29,7 @@ assert_eq!(&[2, 2], &*sv.into_vec());
 # }
 ```
 
-The following will not compile, because the first borrow of `wrapper` by the call to `jail` continues as long as `idx` is in scope, and conflicts with the call to `make_compact`:
+The following will not compile, because the first borrow of `sv` by the call to `jail` continues as long as `idx` is in scope, and conflicts with the call to `make_compact`:
 
 ```compile_fail
 # fn main() {
@@ -35,9 +37,33 @@ The following will not compile, because the first borrow of `wrapper` by the cal
 let mut sv = StableVec::<i32>::new();
 let idx = sv.jail().push(5);
 sv.make_compact();
-// error[E0499]: cannot borrow `wrapper` as mutable more than once at a time
+// error[E0499]: cannot borrow `sv` as mutable more than once at a time
 # }
 ```
+
+Note that this doesn't prevent every case where indexes can
+become invalid. In particular, if you have two
+`JailedStableVec`s, where one outlives the other, it is
+possible to have bugs like the following:
+
+```should_panic
+# fn main() {
+#    use stable_vec::StableVec;
+    let mut sv1 = StableVec::<i32>::new();
+    let mut jailed1 = sv1.jail();
+    let mut sv2 = StableVec::<i32>::new();
+    let mut jailed2 = sv2.jail();
+    let idx = jailed1.push(4);
+
+    // this will fail, because idx is only valid for jailed1.
+    // But it compiles because jailed1 outlives jailed2
+    assert_eq!(4, jailed2[idx]);
+# }
+```
+
+and, of course, if you call `.pop()` or `.remove(idx)`, then
+the last index, or `idx` in the case of `remove`, will become
+invalid.
 */
 
 use super::StableVec;
