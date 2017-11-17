@@ -6,13 +6,13 @@ of the JailedStableVec.
 
 ```
 # fn main() {
-use stable_vec::jailed::Wrapper;
+use stable_vec::StableVec;
 
-let mut wrapper = Wrapper::<i32>::new();
+let mut sv = StableVec::new();
 
 for _ in 0..2 {
     {
-        let mut jailed = wrapper.jail();
+        let mut jailed = sv.jail();
         let idx1 = jailed.push(1);
         let idx2 = jailed.push(2);
         let sum = jailed[idx1] + jailed[idx2];
@@ -20,10 +20,10 @@ for _ in 0..2 {
         assert_eq!(3, sum);
     }
 
-    wrapper.make_compact();
+    sv.make_compact();
 }
 
-assert_eq!(&[2, 2], &*wrapper.into_vec());
+assert_eq!(&[2, 2], &*sv.into_vec());
 # }
 ```
 
@@ -31,10 +31,10 @@ The following will not compile, because the first borrow of `wrapper` by the cal
 
 ```compile_fail
 # fn main() {
-# use stable_vec::jailed::Wrapper;
-let mut wrapper = Wrapper::<i32>::new();
-let idx = wrapper.jail().push(5);
-wrapper.make_compact();
+# use stable_vec::StableVec;
+let mut sv = StableVec::<i32>::new();
+let idx = sv.jail().push(5);
+sv.make_compact();
 // error[E0499]: cannot borrow `wrapper` as mutable more than once at a time
 # }
 ```
@@ -45,35 +45,9 @@ use ::std;
 
 use std::marker::PhantomData;
 
-pub struct Wrapper<T>(StableVec<T>);
-
-impl<T> Wrapper<T> {
-    pub fn new() -> Self {
-        Wrapper(StableVec::new())
-    }
-
-    pub fn jail(&mut self) -> JailedStableVec<T> {
-        JailedStableVec(&mut self.0)
-    }
-
-    pub fn make_compact(&mut self) {
-        self.0.make_compact();
-    }
-
-    pub fn reordering_make_compact(&mut self) {
-        self.0.reordering_make_compact();
-    }
-
-    pub fn is_compact(&self) -> bool {
-        self.0.is_compact()
-    }
-
-    pub fn num_elements(&self) -> usize {
-        self.0.num_elements()
-    }
-
-    pub fn into_vec(self) -> Vec<T> {
-        self.0.into_vec()
+impl<T> StableVec<T> {
+    pub fn jail<'a>(&'a mut self) -> JailedStableVec<'a, T> {
+        JailedStableVec(self)
     }
 }
 
